@@ -8,9 +8,22 @@ import 'package:permission_handler/permission_handler.dart';
 
 class NetworkDetails {
   String? name, ipv4, ipv6, broadcastIP;
-  String interface;
-  NetworkDetails(
-      this.name, this.ipv4, this.ipv6, this.broadcastIP, this.interface);
+  static String? _interface;
+  static Future<String> getInterface() async {
+    if (_interface == null) {
+      _interface = '';
+      final interfaces = await NetworkInterface.list();
+      for (var i in interfaces) {
+        if (i.name.startsWith('wl')) {
+          _interface = i.name;
+          break;
+        }
+      }
+    }
+    return _interface!;
+  }
+
+  NetworkDetails(this.name, this.ipv4, this.ipv6, this.broadcastIP);
 
   static Future<NetworkDetails> getDetails() async {
     if (Platform.isAndroid) {
@@ -18,20 +31,11 @@ class NetworkDetails {
     }
     final info = NetworkInfo();
 
-    String interface = '';
-    final interfaces = await NetworkInterface.list();
-    for (var i in interfaces) {
-      if (i.name.startsWith('wl')) {
-        interface = i.name;
-        break;
-      }
-    }
     return NetworkDetails(
       await info.getWifiName() ?? '(Allow location permission)',
       await info.getWifiIP(),
       await info.getWifiIPv6(),
       await info.getWifiBroadcast(),
-      interface,
     );
   }
 

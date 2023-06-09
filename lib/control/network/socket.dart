@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:cheetah_connect/control/details.dart';
+
 class MySocketServer {
   late int port;
   late ServerSocket _server;
@@ -25,8 +27,9 @@ class MySocketClient {
 
   static Future<MySocketClient> connect(String ip, int port) async {
     MySocketClient instance = MySocketClient();
+    String interface = await NetworkDetails.getInterface();
     instance.socket = await Socket.connect(
-      InternetAddress(ip, type: InternetAddressType.IPv6),
+      InternetAddress('$ip%$interface', type: InternetAddressType.IPv6),
       port,
     );
 

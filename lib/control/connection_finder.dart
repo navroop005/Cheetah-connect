@@ -101,11 +101,11 @@ class ConnectionFinder {
         final networkDetails = await NetworkDetails.getDetails();
         if (ipv6 != networkDetails.ipv6) {
           debugPrint(
-              'name: $name IPv6 : $ipv6 port: $port interface: ${networkDetails.interface}');
+              'name: $name IPv6 : $ipv6 port: $port');
           PairedDevice device = PairedDevice.list.find(name);
           if (!device.isConnected) {
             await Connection.handleConnect(
-                device, '$ipv6%${networkDetails.interface}', port);
+                device, ipv6, port);
           }
         }
       }
