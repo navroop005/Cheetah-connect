@@ -31,7 +31,12 @@ class ShareHandler {
           chatHandler.receiveText(data['text']!);
           break;
         case 'chat-file':
-          chatHandler.receiveFile(data['fileName']!, data['fileData']!);
+          chatHandler.receiveFile(
+            data['fileName']!,
+            int.parse(data['fileSize']!),
+            data['IPv6']!,
+            int.parse(data['port']!),
+          );
           break;
         default:
           debugPrint('Invalid request: $request');

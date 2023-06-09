@@ -1,6 +1,8 @@
-import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 
+import 'package:cheetah_connect/control/details.dart';
+import 'package:cheetah_connect/control/network/socket.dart';
 import 'package:cheetah_connect/control/sharing/share.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:file_selector/file_selector.dart';
@@ -19,12 +21,14 @@ class ChatHandler with ChangeNotifier {
   }
 
   void receiveText(String text) {
-    addMessage(MessageDetail(
+    final message = MessageDetail(
       _shareHandler,
       text: text,
       time: DateTime.now(),
       byCurrent: false,
-    ));
+    );
+    message.isTransfered = true;
+    addMessage(message);
     debugPrint('Recieved message');
   }
 
@@ -40,19 +44,22 @@ class ChatHandler with ChangeNotifier {
 
   void sendFile() async {
     String? fileName;
-    Uint8List? fileData;
+    Stream<List<int>>? fileStream;
+    int? fileSize;
     if (Platform.isAndroid) {
       FilePickerResult? result = await FilePicker.platform.pickFiles();
       if (result != null) {
-        File file = File(result.files.single.path!);
         fileName = result.files.single.name;
-        fileData = await file.readAsBytes();
+        File file = File(result.files.single.path!);
+        fileSize = await file.length();
+        fileStream = file.openRead();
       }
     } else {
       final XFile? file = await openFile();
       if (file != null) {
         fileName = file.name;
-        fileData = await file.readAsBytes();
+        fileSize = await file.length();
+        fileStream = file.openRead();
       }
     }
     if (fileName != null) {
@@ -62,22 +69,25 @@ class ChatHandler with ChangeNotifier {
         time: DateTime.now(),
         byCurrent: true,
         fileName: fileName,
-        fileData: fileData,
+        fileSize: fileSize,
+        fileStream: fileStream,
       );
       addMessage(message);
     }
   }
 
-  void receiveFile(String fileName, String fileData) async {
+  void receiveFile(
+      String fileName, int fileSize, String serverIP, int port) async {
     final message = MessageDetail(
       _shareHandler,
       text: fileName,
       time: DateTime.now(),
       byCurrent: false,
       fileName: fileName,
-      fileData: base64Decode(fileData),
+      fileSize: fileSize,
     );
     addMessage(message);
+    message.receiveFile(serverIP, port);
   }
 }
 
@@ -87,29 +97,27 @@ class MessageDetail with ChangeNotifier {
   bool byCurrent;
   DateTime time;
   String? fileName;
-  Uint8List? fileData;
-  int? size;
+  Stream<List<int>>? fileStream;
+  int? fileSize;
+  String? filePath;
   bool isTransfered = false;
-  bool failed = false;
-  double progress = 0;
+  bool isFailed = false;
+  double? progress;
   MessageDetail(
     this._handler, {
     required this.text,
     required this.time,
     required this.byCurrent,
     this.fileName,
-    this.fileData,
-    this.size,
+    this.fileStream,
+    this.fileSize,
+    this.filePath,
   }) {
     if (byCurrent) {
       if (fileName == null) {
         _sendText();
       } else {
         _sendFile();
-      }
-    } else {
-      if (fileName != null) {
-        _receiveFile();
       }
     }
   }
@@ -122,29 +130,53 @@ class MessageDetail with ChangeNotifier {
       isTransfered = true;
     } else {
       debugPrint('Not connected');
-      failed = true;
+      isFailed = true;
     }
     notifyListeners();
   }
 
   void _sendFile() async {
-    final data = {
-      'request': 'chat-file',
-      'fileName': fileName!,
-      'fileData': base64.encode(fileData!),
-    };
-
     if (_handler.device.isConnected) {
+      String ipv6 = (await NetworkDetails.getDetails()).ipv6!;
+      MySocketServer server = await MySocketServer.start((client) async {
+        debugPrint('Connected reciever ${DateTime.now()}');
+        int sent = 0;
+        final stream = fileStream!.listen((data) {
+          client.add(data);
+          sent += data.length;
+          progress = sent / fileSize!;
+          notifyListeners();
+        });
+        await stream.asFuture();
+
+        await client.flush();
+        client.destroy();
+        if (sent == fileSize) {
+          debugPrint(
+              'File Sent ${DateTime.now()}, Total time: ${DateTime.now().difference(time)}');
+          isTransfered = true;
+        } else {
+          debugPrint('File send error, $progress');
+          isFailed = true;
+        }
+        notifyListeners();
+      });
+      final data = {
+        'request': 'chat-file',
+        'fileName': fileName!,
+        'fileSize': '$fileSize',
+        'IPv6': ipv6,
+        'port': '${server.port}',
+      };
       await _handler.sendData(data);
-      isTransfered = true;
     } else {
       debugPrint('Not connected');
-      failed = true;
+      isFailed = true;
     }
     notifyListeners();
   }
 
-  void _receiveFile() async {
+  Future<File> _createFile() async {
     late Directory? dir;
     if (Platform.isAndroid) {
       final storagePermission =
@@ -158,10 +190,35 @@ class MessageDetail with ChangeNotifier {
     }
     final downloadDir = Directory('${dir?.path}/RecievedFiles');
     downloadDir.createSync();
-    File file = File('${downloadDir.path}/$fileName');
-    await file.writeAsBytes(fileData!);
-    debugPrint('Saved at: ${file.path}');
-    isTransfered = true;
+    final file = File('${downloadDir.path}/$fileName');
+    filePath = file.path;
+    debugPrint('File created: $filePath');
+    return file;
+  }
+
+  void receiveFile(String ip, int port) async {
+    MySocketClient client = await MySocketClient.connect(ip, port);
+    File file = await _createFile();
+    final writer = file.openWrite();
+
+    int recieved = 0;
+    final stream = client.socket.listen(
+      (data) {
+        writer.add(data);
+        recieved += data.length;
+        progress = recieved / fileSize!;
+        notifyListeners();
+      },
+    );
+    await stream.asFuture();
+
+    if (recieved == fileSize) {
+      debugPrint('File recieved, time: ${DateTime.now().difference(time)}');
+      isTransfered = true;
+    } else {
+      debugPrint('File receive error, $progress');
+      isFailed = true;
+    }
     notifyListeners();
   }
 }

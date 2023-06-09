@@ -1,6 +1,5 @@
-import 'package:cheetah_connect/control/sharing/chat.dart';
 import 'package:cheetah_connect/control/paired.dart';
-import 'package:cheetah_connect/control/utils.dart';
+import 'package:cheetah_connect/control/sharing/chat.dart';
 import 'package:flutter/material.dart';
 
 class DevicePage extends StatelessWidget {
@@ -180,38 +179,66 @@ class MessageContainer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     double width = MediaQuery.of(context).size.width;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Align(
-        alignment:
-            data.byCurrent ? Alignment.centerRight : Alignment.centerLeft,
-        child: ConstrainedBox(
-          constraints: BoxConstraints.loose(
-            Size(width * 0.80, double.infinity),
-          ),
-          child: Tooltip(
-            message: Utils.formatDateTime(data.time),
-            child: Material(
-              elevation: 2,
-              color: data.byCurrent
-                  ? Theme.of(context).colorScheme.primaryContainer
-                  : Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(15),
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(
-                  data.text,
-                  style: TextStyle(
-                    color: data.byCurrent
-                        ? Theme.of(context).colorScheme.onPrimaryContainer
-                        : Theme.of(context).colorScheme.onSurface,
+    return AnimatedBuilder(
+        animation: data,
+        builder: (context, _) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            child: Align(
+              alignment:
+                  data.byCurrent ? Alignment.centerRight : Alignment.centerLeft,
+              child: ConstrainedBox(
+                constraints: BoxConstraints.loose(
+                  Size(width * 0.80, double.infinity),
+                ),
+                child: Material(
+                  elevation: 2,
+                  color: data.byCurrent
+                      ? Theme.of(context).colorScheme.primaryContainer
+                      : Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(15),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (data.fileName != null)
+                          const Icon(
+                            Icons.file_present_rounded,
+                            size: 30,
+                          ),
+                        if (data.fileName != null) const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            data.text,
+                            style: TextStyle(
+                              color: data.byCurrent
+                                  ? Theme.of(context)
+                                      .colorScheme
+                                      .onPrimaryContainer
+                                  : Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        if (data.isTransfered) const Icon(Icons.done),
+                        if (data.isFailed) const Icon(Icons.error),
+                        if (!data.isTransfered && !data.isFailed)
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              value: data.progress,
+                              strokeWidth: 3,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ),
-      ),
-    );
+          );
+        });
   }
 }
