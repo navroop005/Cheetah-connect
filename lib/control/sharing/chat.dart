@@ -138,29 +138,11 @@ class MessageDetail with ChangeNotifier {
   void _sendFile() async {
     if (_handler.device.isConnected) {
       String ipv6 = (await NetworkDetails.getDetails()).ipv6!;
-      MySocketServer server = await MySocketServer.start((client) async {
-        debugPrint('Connected reciever ${DateTime.now()}');
-        int sent = 0;
-        final stream = fileStream!.listen((data) {
-          client.add(data);
-          sent += data.length;
-          progress = sent / fileSize!;
-          notifyListeners();
-        });
-        await stream.asFuture();
 
-        await client.flush();
-        client.destroy();
-        if (sent == fileSize) {
-          debugPrint(
-              'File Sent ${DateTime.now()}, Total time: ${DateTime.now().difference(time)}');
-          isTransfered = true;
-        } else {
-          debugPrint('File send error, $progress');
-          isFailed = true;
-        }
-        notifyListeners();
-      });
+      // Create socket to send file
+      MySocketServer server = await MySocketServer.start(onRecieverConnect);
+
+      // Send server details to reciever
       final data = {
         'request': 'chat-file',
         'fileName': fileName!,
@@ -173,6 +155,48 @@ class MessageDetail with ChangeNotifier {
       debugPrint('Not connected');
       isFailed = true;
     }
+    notifyListeners();
+  }
+
+  void onRecieverConnect(Socket client) async {
+    debugPrint('Connected reciever ${DateTime.now()}');
+    int sent = 0;
+    int currentBuffer = 0;
+  
+    // Send file
+    final stream = fileStream!.asyncMap((event) async {
+      client.add(event);
+      sent += event.length;
+      currentBuffer += event.length;
+      progress = sent / fileSize!;
+  
+      // Flush buffer every 1 MB
+      if (currentBuffer > 1000000) {
+        await client.flush();
+        currentBuffer = 0;
+      }
+    });
+  
+    // Update UI every 250 ms
+    Timer timer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
+      notifyListeners();
+    });
+  
+    // Wait for stream to end
+    await stream.drain();
+    await client.flush();
+    client.destroy();
+  
+    if (sent == fileSize) {
+      debugPrint(
+          'File Sent ${DateTime.now()}, Total time: ${DateTime.now().difference(time)}');
+      isTransfered = true;
+    } else {
+      debugPrint('File send error, $progress');
+      isFailed = true;
+    }
+
+    timer.cancel();
     notifyListeners();
   }
 
@@ -197,30 +221,48 @@ class MessageDetail with ChangeNotifier {
   }
 
   void receiveFile(String ip, int port) async {
+    // Connect to sender socket
     MySocketClient client = await MySocketClient.connect(ip, port);
+
+    // Create and open file to write
     File file = await _createFile();
     final writer = file.openWrite();
 
+    // Recieve file
     int recieved = 0;
     final stream = client.socket.listen(
       (data) {
         writer.add(data);
         recieved += data.length;
         progress = recieved / fileSize!;
-        notifyListeners();
       },
     );
+
+    // Update UI every 250 ms
+    Timer timer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
+      notifyListeners();
+    });
+
+    // Wait for stream to end
     await stream.asFuture();
 
     if (recieved == fileSize) {
-      debugPrint('File recieved, time: ${DateTime.now().difference(time)}');
+      Duration timeTaken = DateTime.now().difference(time);
+      debugPrint(
+          'File recieved, time: $timeTaken, Speed: ${fileSize! / timeTaken.inMilliseconds / 1000} MBps');
       isTransfered = true;
     } else {
       debugPrint('File receive error, $progress');
       isFailed = true;
     }
+
+    // Close file
+    await writer.close();
+
+    // Close socket
+    client.socket.destroy();
+
+    timer.cancel();
     notifyListeners();
   }
 }
-
-class FileShareConnection {}
