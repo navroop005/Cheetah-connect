@@ -22,7 +22,8 @@ class ConnectionFinder {
   static Future<bool> start() async {
     PairServer.start();
     try {
-      _broadcast = UdpBroadcast(8003, (await NetworkDetails.getDetails()).broadcastIP!);
+      _broadcast =
+          UdpBroadcast(8003, (await NetworkDetails.getDetails()).broadcastIP!);
       await _broadcast!.startListen(_onRecieve);
       return true;
     } catch (e) {
@@ -36,6 +37,7 @@ class ConnectionFinder {
     final map = (await _deviceDetails).broadcastData;
     map['type'] = 'pair';
     String data = jsonEncode(map);
+    debugPrint('Started Pair broadcast: $data');
     _pairBroadcast = Timer.periodic(
       const Duration(seconds: 1),
       (timer) {
@@ -98,14 +100,12 @@ class ConnectionFinder {
         String name = details['name']!;
         String ipv6 = details['IPv6']!;
         int port = details['port']!;
-        final networkDetails = await NetworkDetails.getDetails();
-        if (ipv6 != networkDetails.ipv6) {
-          debugPrint(
-              'name: $name IPv6 : $ipv6 port: $port');
+        // final networkDetails = await NetworkDetails.getDetails();
+        if (name != (await _deviceDetails).name) {
+          debugPrint('name: $name IPv6 : $ipv6 port: $port');
           PairedDevice device = PairedDevice.list.find(name);
           if (!device.isConnected) {
-            await Connection.handleConnect(
-                device, ipv6, port);
+            await Connection.handleConnect(device, ipv6, port);
           }
         }
       }

@@ -58,9 +58,13 @@ class Connection {
 
   static Future<void> handleConnect(
       PairedDevice device, String ip, int port) async {
-    MySocketClient client = await MySocketClient.connect(ip, port);
-    device.socket = client.socket;
-    ConnectionFinder.stopConnectBroadcast();
-    debugPrint('Connected as client');
+    try {
+      MySocketClient client = await MySocketClient.connect(ip, port);
+      device.socket = client.socket;
+      ConnectionFinder.stopConnectBroadcast();
+      debugPrint('Connected as client');
+    } catch (e) {
+      debugPrint('Error connecting: $e');
+    }
   }
 }

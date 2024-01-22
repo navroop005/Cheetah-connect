@@ -27,7 +27,8 @@ class MySocketClient {
 
   static Future<MySocketClient> connect(String ip, int port) async {
     MySocketClient instance = MySocketClient();
-    String interface = await NetworkDetails.getInterface();
+    String interface =
+        await NetworkDetails.getDetails().then((value) => value.interface!);
     instance.socket = await Socket.connect(
       InternetAddress('$ip%$interface', type: InternetAddressType.IPv6),
       port,

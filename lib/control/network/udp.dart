@@ -33,7 +33,7 @@ class UdpBroadcast {
 
   void sendData(String data) async {
     if (_socket != null) {
-      _socket!.send(utf8.encode(data), InternetAddress('192.168.18.255'), 8003);
+      _socket!.send(utf8.encode(data), InternetAddress(broadcastAddress), 8003);
     } else {
       debugPrint("_socket null");
     }
