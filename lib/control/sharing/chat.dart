@@ -44,6 +44,7 @@ class ChatHandler with ChangeNotifier {
 
   void sendFile() async {
     String? fileName;
+    String? filePath;
     Stream<List<int>>? fileStream;
     int? fileSize;
     if (Platform.isAndroid) {
@@ -53,6 +54,7 @@ class ChatHandler with ChangeNotifier {
         File file = File(result.files.single.path!);
         fileSize = await file.length();
         fileStream = file.openRead();
+        filePath = file.path;
       }
     } else {
       final XFile? file = await openFile();
@@ -60,6 +62,7 @@ class ChatHandler with ChangeNotifier {
         fileName = file.name;
         fileSize = await file.length();
         fileStream = file.openRead();
+        filePath = file.path;
       }
     }
     if (fileName != null) {
@@ -71,6 +74,7 @@ class ChatHandler with ChangeNotifier {
         fileName: fileName,
         fileSize: fileSize,
         fileStream: fileStream,
+        filePath: filePath,
       );
       addMessage(message);
     }
@@ -162,31 +166,31 @@ class MessageDetail with ChangeNotifier {
     debugPrint('Connected reciever ${DateTime.now()}');
     int sent = 0;
     int currentBuffer = 0;
-  
+
     // Send file
     final stream = fileStream!.asyncMap((event) async {
       client.add(event);
       sent += event.length;
       currentBuffer += event.length;
       progress = sent / fileSize!;
-  
+
       // Flush buffer every 1 MB
       if (currentBuffer > 1000000) {
         await client.flush();
         currentBuffer = 0;
       }
     });
-  
+
     // Update UI every 250 ms
     Timer timer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
       notifyListeners();
     });
-  
+
     // Wait for stream to end
     await stream.drain();
     await client.flush();
     client.destroy();
-  
+
     if (sent == fileSize) {
       debugPrint(
           'File Sent ${DateTime.now()}, Total time: ${DateTime.now().difference(time)}');

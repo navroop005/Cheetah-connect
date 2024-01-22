@@ -1,6 +1,7 @@
 import 'package:cheetah_connect/control/paired.dart';
 import 'package:cheetah_connect/control/sharing/chat.dart';
 import 'package:flutter/material.dart';
+import 'package:open_app_file/open_app_file.dart';
 
 class DevicePage extends StatelessWidget {
   final PairedDevice device;
@@ -180,23 +181,33 @@ class MessageContainer extends StatelessWidget {
   Widget build(BuildContext context) {
     double width = MediaQuery.of(context).size.width;
     return AnimatedBuilder(
-        animation: data,
-        builder: (context, _) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5),
-            child: Align(
-              alignment:
-                  data.byCurrent ? Alignment.centerRight : Alignment.centerLeft,
-              child: ConstrainedBox(
-                constraints: BoxConstraints.loose(
-                  Size(width * 0.80, double.infinity),
-                ),
-                child: Material(
-                  elevation: 2,
-                  color: data.byCurrent
-                      ? Theme.of(context).colorScheme.primaryContainer
-                      : Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(15),
+      animation: data,
+      builder: (context, _) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 5),
+          child: Align(
+            alignment:
+                data.byCurrent ? Alignment.centerRight : Alignment.centerLeft,
+            child: ConstrainedBox(
+              constraints: BoxConstraints.loose(
+                Size(width * 0.80, double.infinity),
+              ),
+              child: Material(
+                elevation: 2,
+                color: data.byCurrent
+                    ? Theme.of(context).colorScheme.primaryContainer
+                    : Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(15),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () {
+                    if (data.filePath != null) {
+                      debugPrint('Open file ${data.filePath}');
+                      OpenAppFile.open(data.filePath!);
+                    } else {
+                      debugPrint('No file path');
+                    }
+                  },
                   child: Padding(
                     padding: const EdgeInsets.all(8.0),
                     child: Row(
@@ -238,7 +249,9 @@ class MessageContainer extends StatelessWidget {
                 ),
               ),
             ),
-          );
-        });
+          ),
+        );
+      },
+    );
   }
 }
