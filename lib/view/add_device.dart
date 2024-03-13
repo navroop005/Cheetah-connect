@@ -16,9 +16,20 @@ class AddDialog extends StatefulWidget {
 class _AddDialogState extends State<AddDialog> {
   @override
   Widget build(BuildContext context) {
-    return const AlertDialog(
-      title: Text('Add device'),
-      content: Column(
+    return AlertDialog(
+      title: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text('Add device'),
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
+      ),
+      content: const Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           NetworkDetailWidget(),

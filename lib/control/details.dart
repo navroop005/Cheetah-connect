@@ -8,9 +8,10 @@ import 'package:permission_handler/permission_handler.dart';
 
 class NetworkDetails {
   String? name, ipv4, ipv6, broadcastIP, interface;
+  NetworkInterfaceDetails? allInterfaces;
 
-  NetworkDetails(
-      this.name, this.ipv4, this.ipv6, this.broadcastIP, this.interface);
+  NetworkDetails(this.name, this.ipv4, this.ipv6, this.broadcastIP,
+      this.interface, this.allInterfaces);
 
   static Future<NetworkDetails> getDetails() async {
     // interfaces?.printInterfaceDetails();
@@ -19,24 +20,26 @@ class NetworkDetails {
       await Permission.locationWhenInUse.request();
     }
     final info = NetworkInfo();
-    final interfaces = await NetworkInterfaceDetails.getInterfaces();
+    final allInterfaces = await NetworkInterfaceDetails.getInterfaces();
+    final preferredInterface = allInterfaces?.prefferedInterfaces.first;
 
-    String? ipv4 = await info.getWifiIP();
-    String? ipv6 = await info.getWifiIPv6();
-    String? broadcastIP = await info.getWifiBroadcast();
+    String? ipv4;
+    String? ipv6;
+    String? broadcastIP;
     String? interface;
 
     try {
-      if (interfaces != null) {
-        ipv4 = interfaces.prefferedIPv4.first;
-        ipv6 = interfaces.linkLocalIPv6.first;
-        interface = interfaces.linkLocalInterfaces.first.name;
+      if (allInterfaces != null) {
+        ipv4 = preferredInterface?.ipv4.first;
+        ipv6 = preferredInterface?.linkLocalIPv6.first;
+        interface = preferredInterface?.id.toString();
       }
+      ipv4 ??= await info.getWifiIP();
+      ipv6 ??= await info.getWifiIPv6();
+      broadcastIP ??= await info.getWifiBroadcast();
     } catch (e) {
       debugPrint('Error getting network interfaces: $e');
     }
-
-    broadcastIP ??= '${ipv4?.split('.').take(3).join('.')}.255';
 
     return NetworkDetails(
       await info.getWifiName() ?? '(Allow location permission)',
@@ -44,6 +47,7 @@ class NetworkDetails {
       ipv6,
       broadcastIP,
       interface,
+      allInterfaces,
     );
   }
 
@@ -57,44 +61,65 @@ class NetworkDetails {
   }
 }
 
-class NetworkInterfaceDetails {
-  final List<NetworkInterface> interfaces;
-  List<NetworkInterface> linkLocalInterfaces = [];
-  List<String> linkLocalIPv6 = [];
-  List<String> globalIPv6 = [];
-  List<String> prefferedIPv4 = [];
+class Interface {
+  String name;
+  int id;
+  List<String> ipv4;
+  List<String> linkLocalIPv6;
+  List<String> globalIPv6;
 
-  NetworkInterfaceDetails(this.interfaces) {
-    linkLocalInterfaces = interfaces
+  Interface(this.name, this.id, this.ipv4, this.linkLocalIPv6, this.globalIPv6);
+}
+
+class NetworkInterfaceDetails {
+  final List<NetworkInterface> allInterfaces;
+  List<Interface> prefferedInterfaces = [];
+
+  NetworkInterfaceDetails(this.allInterfaces) {
+    List<NetworkInterface> linkLocalInterfaces = allInterfaces
         .where((element) => element.addresses.any((addr) => addr.isLinkLocal))
         .toList();
 
-    for (var i in linkLocalInterfaces) {
-      for (var addr in i.addresses) {
-        if (addr.type == InternetAddressType.IPv6) {
-          String address = addr.address.split('%').first;
-          if (addr.isLinkLocal) {
-            linkLocalIPv6.add(address);
-          } else {
-            globalIPv6.add(address);
-          }
-        } else if (addr.type == InternetAddressType.IPv4) {
-          prefferedIPv4.add(addr.address);
-        }
-      }
+    if (Platform.isWindows) {
+      linkLocalInterfaces = linkLocalInterfaces
+          .where((element) => element.name.contains('Wi-Fi'))
+          .toList();
     }
 
-    for (var i in prefferedIPv4) {
-      debugPrint('Preffered IPv4: $i');
-    }
-    for (var i in linkLocalIPv6) {
-      debugPrint('Link-local IPv6: $i');
-    }
-    for (var i in globalIPv6) {
-      debugPrint('Global IPv6: $i');
-    }
     for (var i in linkLocalInterfaces) {
-      debugPrint('Link-local interface: ${i.name}');
+      prefferedInterfaces.add(Interface(
+        i.name,
+        i.index,
+        i.addresses
+            .where((addr) => addr.type == InternetAddressType.IPv4)
+            .map((addr) => addr.address)
+            .toList(),
+        i.addresses
+            .where((addr) => addr.type == InternetAddressType.IPv6)
+            .where((addr) => addr.isLinkLocal)
+            .map((addr) => addr.address.split('%').first)
+            .toList(),
+        i.addresses
+            .where((addr) => addr.type == InternetAddressType.IPv6)
+            .where((addr) => !addr.isLinkLocal)
+            .map((addr) => addr.address.split('%').first)
+            .toList(),
+      ));
+    }
+
+    for (var i in prefferedInterfaces) {
+      debugPrint('Preffered interface: ${i.name}');
+      debugPrint('  ID: ${i.id}');
+
+      for (var j in i.ipv4) {
+        debugPrint('  IPv4: $j');
+      }
+      for (var j in i.linkLocalIPv6) {
+        debugPrint('  Link-local IPv6: $j');
+      }
+      for (var j in i.globalIPv6) {
+        debugPrint('  Global IPv6: $j');
+      }
     }
   }
 
@@ -114,7 +139,7 @@ class NetworkInterfaceDetails {
   }
 
   void printInterfaceDetails() {
-    for (var interface in interfaces) {
+    for (var interface in allInterfaces) {
       debugPrint('Interface: ${interface.name}');
       for (var address in interface.addresses) {
         debugPrint('  Address: ${address.address}');
@@ -148,10 +173,9 @@ class DeviceDetail {
       name = linuxInfo.prettyName;
     } else if (Platform.isWindows) {
       WindowsDeviceInfo winInfo = await deviceInfo.windowsInfo;
-      name = winInfo.userName;
+      name = winInfo.computerName;
     }
 
-    debugPrint(name);
     return DeviceDetail(name, networkDetails.ipv4, networkDetails.ipv6, os);
   }
 
