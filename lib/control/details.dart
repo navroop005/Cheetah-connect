@@ -32,7 +32,11 @@ class NetworkDetails {
       if (allInterfaces != null) {
         ipv4 = preferredInterface?.ipv4.first;
         ipv6 = preferredInterface?.linkLocalIPv6.first;
-        interface = preferredInterface?.id.toString();
+        if (Platform.isWindows) {
+          interface = preferredInterface?.id.toString();
+        } else {
+          interface = preferredInterface?.name;
+        }
       }
       ipv4 ??= await info.getWifiIP();
       ipv6 ??= await info.getWifiIPv6();

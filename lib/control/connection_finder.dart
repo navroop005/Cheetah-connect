@@ -22,12 +22,13 @@ class ConnectionFinder {
   static Future<bool> start() async {
     PairServer.start();
     try {
-      _broadcast =
-          UdpBroadcast(8003, (await NetworkDetails.getDetails()).broadcastIP!);
+      String? broadcastIP = (await NetworkDetails.getDetails()).broadcastIP;
+      debugPrint("Broadcast IP: $broadcastIP");
+      _broadcast = UdpBroadcast(8003, broadcastIP);
       await _broadcast!.startListen(_onRecieve);
       return true;
     } catch (e) {
-      debugPrint('$e');
+      debugPrint('Error ConnectionFinder start: $e');
       return false;
     }
   }
@@ -80,6 +81,7 @@ class ConnectionFinder {
   }
 
   static void _onRecieve(String data) async {
+    debugPrint('Recieved broadcast: $data');
     try {
       Map<String, dynamic> details =
           Map<String, dynamic>.from(jsonDecode(data));

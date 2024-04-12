@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 
 class UdpBroadcast {
   int port;
-  String broadcastAddress;
+  String? broadcastAddress;
   UdpBroadcast(this.port, this.broadcastAddress);
 
   RawDatagramSocket? _socket;
@@ -32,10 +32,12 @@ class UdpBroadcast {
   }
 
   void sendData(String data) async {
-    if (_socket != null) {
-      _socket!.send(utf8.encode(data), InternetAddress(broadcastAddress), 8003);
+    if (_socket != null && broadcastAddress != null) {
+      _socket!
+          .send(utf8.encode(data), InternetAddress(broadcastAddress!), 8003);
     } else {
-      debugPrint("_socket null");
+      debugPrint(
+          "Cannot send data: socket: ${_socket != null}, broadcastAddress: $broadcastAddress");
     }
   }
 
