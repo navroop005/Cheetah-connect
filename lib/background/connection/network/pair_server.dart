@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:cheetah_connect/control/connection.dart';
+import 'package:cheetah_connect/background/connection/connection_maker.dart';
 import 'package:cheetah_connect/control/details.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shelf/shelf.dart';
@@ -19,7 +19,7 @@ class PairServer {
         String body = await request.readAsString();
         Map<String, String> map = Map<String, String>.from(jsonDecode(body));
         debugPrint('Connection request: $map');
-        bool accepted = await Connection.handlePair(
+        bool accepted = await ConnectionMaker.handlePair(
           DeviceDetail(
             map['name']!,
             map['IPv4']!,
@@ -34,7 +34,7 @@ class PairServer {
           return Response.forbidden('Connection rejected');
         }
       } catch (e) {
-        debugPrint('Error: $e');
+        debugPrint('Error PairServer _pair: $e');
         return Response.badRequest();
       }
     } else {

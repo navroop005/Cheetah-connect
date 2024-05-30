@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:network_info_plus/network_info_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 class NetworkDetails {
   String? name, ipv4, ipv6, broadcastIP, interface;
@@ -15,10 +14,6 @@ class NetworkDetails {
 
   static Future<NetworkDetails> getDetails() async {
     // interfaces?.printInterfaceDetails();
-
-    if (Platform.isAndroid) {
-      await Permission.locationWhenInUse.request();
-    }
     final info = NetworkInfo();
     final allInterfaces = await NetworkInterfaceDetails.getInterfaces();
     final preferredInterface = allInterfaces?.prefferedInterfaces.first;
@@ -111,24 +106,24 @@ class NetworkInterfaceDetails {
       ));
     }
 
-    for (var i in prefferedInterfaces) {
-      debugPrint('Preffered interface: ${i.name}');
-      debugPrint('  ID: ${i.id}');
+    // for (var i in prefferedInterfaces) {
+    //   debugPrint('Preffered interface: ${i.name}');
+    //   debugPrint('  ID: ${i.id}');
 
-      for (var j in i.ipv4) {
-        debugPrint('  IPv4: $j');
-      }
-      for (var j in i.linkLocalIPv6) {
-        debugPrint('  Link-local IPv6: $j');
-      }
-      for (var j in i.globalIPv6) {
-        debugPrint('  Global IPv6: $j');
-      }
-    }
+    //   for (var j in i.ipv4) {
+    //     debugPrint('  IPv4: $j');
+    //   }
+    //   for (var j in i.linkLocalIPv6) {
+    //     debugPrint('  Link-local IPv6: $j');
+    //   }
+    //   for (var j in i.globalIPv6) {
+    //     debugPrint('  Global IPv6: $j');
+    //   }
+    // }
   }
 
   static Future<NetworkInterfaceDetails?> getInterfaces() async {
-    debugPrint('Getting network interfaces');
+    // debugPrint('Getting network interfaces');
     try {
       final interfaces = await NetworkInterface.list(
         includeLoopback: false,
@@ -163,7 +158,17 @@ class DeviceDetail {
   String? ipv4, ipv6;
   DeviceDetail(this.name, this.ipv4, this.ipv6, this.os);
 
+  static DeviceDetail? _current;
+
   static Future<DeviceDetail> getCurrent() async {
+    if (_current == null) {
+      await updateCurrent();
+    }
+    return _current!;
+  }
+
+  // TODO: update on network change
+  static Future<void> updateCurrent() async {
     String name = 'Unknown';
     String os = Platform.operatingSystem;
     var networkDetails = await NetworkDetails.getDetails();
@@ -180,7 +185,25 @@ class DeviceDetail {
       name = winInfo.computerName;
     }
 
-    return DeviceDetail(name, networkDetails.ipv4, networkDetails.ipv6, os);
+    _current = DeviceDetail(name, networkDetails.ipv4, networkDetails.ipv6, os);
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'os': os,
+      'IPv4': ipv4,
+      'IPv6': ipv6,
+    };
+  }
+
+  static DeviceDetail fromMap(Map<String, dynamic> map) {
+    return DeviceDetail(
+      map['name'],
+      map['IPv4'],
+      map['IPv6'],
+      map['os'],
+    );
   }
 
   Map<String, dynamic> get broadcastData => {

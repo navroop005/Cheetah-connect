@@ -1,8 +1,14 @@
-import 'package:cheetah_connect/control/connection_finder.dart';
-import 'package:cheetah_connect/control/paired.dart';
+import 'dart:io';
+import 'dart:ui';
+
+import 'package:cheetah_connect/control/handle_bg.dart';
+import 'package:cheetah_connect/control/paired_device.dart';
+import 'package:cheetah_connect/control/paired_list.dart';
 import 'package:cheetah_connect/control/utils.dart';
 import 'package:cheetah_connect/view/add_device.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -12,16 +18,42 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
+  late final AppLifecycleListener _listener;
+
   @override
   void initState() {
     super.initState();
-    ConnectionFinder.start();
-    PairedDevice.list.load().then((value) => {setState(() {})});
+    // ConnectionBroadcast.start();
+    // PairedDevice.list.load().then((value) => {setState(() {})});
+    // HandleBgProcess.start();
+    PairedListFg().update();
+
+    _listener = AppLifecycleListener(
+      onResume: () => HandleBgProcess.start(),
+      onPause: () => HandleBgProcess.stop(),
+      onExitRequested: () async {
+        debugPrint('exit requested');
+        HandleBgProcess.stop();
+        return AppExitResponse.cancel;
+      },
+    );
+    _checkPermissions();
+  }
+
+  void _checkPermissions() async {
+    if (Platform.isAndroid) {
+      final status = await Permission.location.status;
+      if (status.isDenied) {
+        await Permission.locationAlways.request();
+      }
+    }
   }
 
   @override
   void dispose() {
-    ConnectionFinder.stop();
+    // HandleBgProcess.stop();
+    debugPrint('dispose');
+    _listener.dispose();
     super.dispose();
   }
 
@@ -35,6 +67,7 @@ class _HomeTabState extends State<HomeTab> {
           child: Card(
             child: Column(
               children: [
+                const TimeUpdate(),
                 Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: Text(
@@ -48,10 +81,11 @@ class _HomeTabState extends State<HomeTab> {
                 ),
                 Expanded(
                   child: AnimatedBuilder(
-                    animation: PairedDevice.list,
+                    animation: PairedListFg(),
                     builder: (context, _) {
                       return ListView(
-                        children: PairedDevice.list.devices
+                        children: PairedListFg()
+                            .devices
                             .map((e) => ListItem(device: e))
                             .toList(),
                       );
@@ -92,9 +126,31 @@ class _HomeTabState extends State<HomeTab> {
   }
 }
 
+class TimeUpdate extends StatefulWidget {
+  const TimeUpdate({super.key});
+
+  @override
+  State<TimeUpdate> createState() => _TimeUpdateState();
+}
+
+class _TimeUpdateState extends State<TimeUpdate> {
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder(
+      stream: FlutterBackgroundService().on('update-time'),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: Text('Waiting for update'));
+        }
+        return Text(snapshot.data!['current_date']);
+      },
+    );
+  }
+}
+
 class ListItem extends StatelessWidget {
   const ListItem({super.key, required this.device});
-  final PairedDevice device;
+  final PairedDeviceFg device;
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(

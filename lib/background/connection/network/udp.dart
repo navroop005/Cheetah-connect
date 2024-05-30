@@ -22,7 +22,6 @@ class UdpBroadcast {
           Datagram? dg = _socket!.receive();
           if (dg != null) {
             String data = utf8.decode(dg.data);
-            // debugPrint('Recieved from ${dg.address.address}: $data');
             onReceive(data);
           }
         }
@@ -33,6 +32,7 @@ class UdpBroadcast {
 
   void sendData(String data) async {
     if (_socket != null && broadcastAddress != null) {
+      // print("sending data: $data");
       _socket!
           .send(utf8.encode(data), InternetAddress(broadcastAddress!), 8003);
     } else {
@@ -46,6 +46,27 @@ class UdpBroadcast {
       _subscription?.cancel();
       _socket?.close();
       debugPrint("Stopped");
+    }
+  }
+
+  Map<String, Timer> timers = {};
+
+  void startPeriodicBroadcast(String name, String data, Duration period) {
+    if (timers.containsKey(name)) {
+      debugPrint("Error startPeriodicBroadcast");
+      return;
+    }
+    timers[name] = Timer.periodic(period, (_) => sendData(data));
+  }
+
+  void stopPeriodicBroadcast(String name) {
+    timers[name]?.cancel();
+    timers.remove(name);
+  }
+
+  void stopAll() {
+    for (var key in timers.keys) {
+      stopPeriodicBroadcast(key);
     }
   }
 }

@@ -1,6 +1,6 @@
-import 'package:cheetah_connect/control/connection.dart';
-import 'package:cheetah_connect/control/connection_finder.dart';
+import 'package:cheetah_connect/background/connection/connection_maker.dart';
 import 'package:cheetah_connect/control/details.dart';
+import 'package:cheetah_connect/control/pairable_list.dart';
 import 'package:cheetah_connect/control/utils.dart';
 import 'package:flutter/material.dart';
 
@@ -76,13 +76,16 @@ class AvailableList extends StatefulWidget {
 }
 
 class _AvailableListState extends State<AvailableList> {
+  PairableListFg pairableList = PairableListFg();
+
   @override
   void initState() {
-    ConnectionFinder.startPairBroadcast();
-    ConnectionFinder.updateAvailable = () {
-      setState(() {});
-    };
+    // ConnectionBroadcast.startPairBroadcast();
+    // ConnectionBroadcast.updateAvailable = () {
+    //   setState(() {});
+    // };
     super.initState();
+    pairableList.findDevices();
   }
 
   @override
@@ -98,14 +101,19 @@ class _AvailableListState extends State<AvailableList> {
           SizedBox(
             height: 300,
             width: 350,
-            child: (ConnectionFinder.availableDevices.isEmpty)
-                ? const Center(
-                    child: Text('Finding devices'),
-                  )
-                : Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: deviceList(),
-                  ),
+            child: AnimatedBuilder(
+              animation: pairableList,
+              builder: (context, child) {
+                return (pairableList.devices.isEmpty)
+                    ? const Center(
+                        child: Text('Finding devices'),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: deviceList(),
+                      );
+              },
+            ),
           ),
         ],
       ),
@@ -114,7 +122,7 @@ class _AvailableListState extends State<AvailableList> {
 
   Widget deviceList() {
     return ListView(
-      children: ConnectionFinder.availableDevices.map((e) {
+      children: pairableList.devices.map((e) {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 2),
           child: ElevatedButton(
@@ -141,7 +149,8 @@ class _AvailableListState extends State<AvailableList> {
 
   @override
   void dispose() {
-    ConnectionFinder.stopPairBroadcast();
+    // ConnectionBroadcast.stopPairBroadcast();
+    pairableList.stopFindDevices();
     super.dispose();
   }
 }
@@ -155,7 +164,8 @@ class ConnectingDialog extends StatefulWidget {
 }
 
 class _ConnectingDialogState extends State<ConnectingDialog> {
-  late final Future<bool> connected = Connection.initiatePair(widget.detail);
+  late final Future<bool> connected =
+      ConnectionMaker.initiatePair(widget.detail);
 
   @override
   Widget build(BuildContext context) {

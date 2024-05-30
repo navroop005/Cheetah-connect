@@ -1,12 +1,21 @@
-import 'package:cheetah_connect/control/paired.dart';
+// import 'package:cheetah_connect/background/bg_service.dart';
+import 'package:cheetah_connect/background/bg_service.dart';
+import 'package:cheetah_connect/background/notification_handler.dart';
+import 'package:cheetah_connect/control/paired_device.dart';
 import 'package:cheetah_connect/control/utils.dart';
 import 'package:cheetah_connect/view/device_page.dart';
 import 'package:cheetah_connect/view/tab_layout.dart';
 import 'package:flutter/material.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
   GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   Utils.navigatorState = navigatorKey;
+  await NotificationHandler.initialize();
+
+  BackgroundService().start();
+
   runApp(MyApp(navigatorKey: navigatorKey));
 }
 
@@ -35,7 +44,7 @@ class MyApp extends StatelessWidget {
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/device') {
-          final device = settings.arguments as PairedDevice;
+          final device = settings.arguments as PairedDeviceFg;
           return MaterialPageRoute(
             builder: (context) {
               return DevicePage(device: device);
